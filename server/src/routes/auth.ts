@@ -14,37 +14,26 @@ router.post('/login', async (req, res) => {
     }
 
     try {
-        const result = await query('SELECT * FROM users WHERE username = $1', [username]);
-        const user = result.rows[0];
+        const result = await query('SELECT * FROM app_users WHERE username = $1', [username]);
 
-        if (user) {
-            // Check if password matches (handling both hashed and temporary plain-text for migration)
-            // @ts-ignore
-            const isMatch = await (bcrypt as any).compare(String(password), String(user.password));
-
-            // Temporary fallback for plain text (remove after first login of all users)
-            const isPlainTextMatch = user.password === password;
-
-            if (isMatch || isPlainTextMatch) {
-                // If it was a plain text match, we should ideally hash it now
-                if (isPlainTextMatch && !isMatch) {
-                    // @ts-ignore
-                    const hashedPassword = await (bcrypt as any).hash(String(password), 10);
-                    await query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, user.id]);
-                }
-
-                // Generate JWT token
-                const token = generateToken(user.id, user.role);
-
-                // Return user without password + token
-                const { password: _, ...userWithoutPassword } = user;
-                res.json({ ...userWithoutPassword, token });
-            } else {
-                res.status(401).json({ message: 'Invalid credentials' });
-            }
-        } else {
-            res.status(401).json({ message: 'Invalid credentials' });
+        if (result.rows.length === 0) {
+            return res.status(401).json({ message: 'Invalid credentials' });
         }
+
+        const user = result.rows[0];
+        // @ts-ignore
+        const isValidPassword = await (bcrypt as any).compare(String(password), user.password);
+
+        if (!isValidPassword) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        // Generate JWT token
+        const token = generateToken(user.id, user.role);
+
+        // Return user without password
+        const { password: _, ...userWithoutPassword } = user;
+        res.json({ ...userWithoutPassword, token });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
@@ -63,7 +52,7 @@ router.post('/register', async (req, res) => {
         // @ts-ignore
         const hashedPassword = await (bcrypt as any).hash(String(password), 10);
         const result = await query(
-            'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
+            'INSERT INTO app_users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
             [username, hashedPassword, role || 'user']
         );
 

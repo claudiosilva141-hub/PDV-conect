@@ -8,7 +8,7 @@ const router = Router();
 // Get All Users (Admin only? For now public for simplicity)
 router.get('/', async (req, res) => {
     try {
-        const result = await query('SELECT id, username, role, created_at FROM users');
+        const result = await query('SELECT id, username, role, created_at FROM app_users');
         // Note: Not returning passwords
         res.json(result.rows);
     } catch (err) {
@@ -23,7 +23,7 @@ router.post('/', async (req, res) => {
         // @ts-ignore
         const hashedPassword = await (bcrypt as any).hash(String(password), 10);
         const result = await query(
-            'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at',
+            'INSERT INTO app_users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at',
             [username, hashedPassword, role]
         );
         res.status(201).json(result.rows[0]);
@@ -44,12 +44,12 @@ router.put('/:id', async (req, res) => {
             // @ts-ignore
             const hashedPassword = await (bcrypt as any).hash(String(password), 10);
             result = await query(
-                'UPDATE users SET username = $1, role = $2, password = $3 WHERE id = $4 RETURNING id, username, role, created_at',
+                'UPDATE app_users SET username = $1, role = $2, password = $3 WHERE id = $4 RETURNING id, username, role, created_at',
                 [username, role, hashedPassword, id]
             );
         } else {
             result = await query(
-                'UPDATE users SET username = $1, role = $2 WHERE id = $3 RETURNING id, username, role, created_at',
+                'UPDATE app_users SET username = $1, role = $2 WHERE id = $3 RETURNING id, username, role, created_at',
                 [username, role, id]
             );
         }
@@ -67,7 +67,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+        const result = await query('DELETE FROM app_users WHERE id = $1 RETURNING id', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
