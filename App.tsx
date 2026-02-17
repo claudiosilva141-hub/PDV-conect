@@ -40,7 +40,8 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userPermissions, setUserPermissions] = useState<UserPermissions>(DEFAULT_USER_PERMISSIONS);
-  const [isInitialSetup, setIsInitialSetup] = useState<boolean>(true);
+  const [isInitialSetup, setIsInitialSetup] = useState<boolean>(false);
+  const [connectionError, setConnectionError] = useState<boolean>(false);
 
   const loadData = async () => {
     try {
@@ -56,13 +57,13 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         loadedUsers,
         loadedPermissions
       ] = await Promise.all([
-        companyService.get().catch(() => ({ name: COMPANY_NAME_DEFAULT, logo: null })),
-        productService.getAll().catch(() => []),
-        rawMaterialService.getAll().catch(() => []),
-        orderService.getAll().catch(() => []),
-        clientService.getAll().catch(() => []),
-        userService.getAll().catch(() => []),
-        permissionService.get().catch(() => DEFAULT_USER_PERMISSIONS)
+        companyService.get(),
+        productService.getAll(),
+        rawMaterialService.getAll(),
+        orderService.getAll(),
+        clientService.getAll(),
+        userService.getAll(),
+        permissionService.get()
       ]);
 
       setCompanyInfo(loadedCompanyInfo);
@@ -73,7 +74,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       setUsers(loadedUsers);
       setUserPermissions(loadedPermissions);
 
+      // Only set initial setup if we successfully fetched users AND the list is empty
       setIsInitialSetup(loadedUsers.length === 0);
+      setConnectionError(false);
 
       // Check for session (simple localStorage persistence for currentUser)
       const storedCurrentUser = localStorage.getItem('currentUser');
@@ -101,8 +104,8 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       console.log('Data loaded successfully.');
     } catch (error) {
       console.error('Failed to load data from Supabase:', error);
-      // Even if loading fails, we allow the app to render, but it might be in an empty state
-      // A more robust app would show a connection error screen.
+      // If loading fails, it's likely a connection issue
+      setConnectionError(true);
       setDataLoaded(true);
     }
   };
@@ -302,6 +305,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     try {
       const newUser = await userService.create({ username, password, role });
       setUsers((prev) => [...prev, newUser]);
+      setIsInitialSetup(false);
     } catch (error) {
       console.error('Failed to register user:', error);
       throw error;
@@ -350,7 +354,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       return true; // Admins always have all permissions
     }
     if (currentUser?.role === UserRole.USER) {
-      return userPermissions[permissionName] || false; // Check specific permission for standard users
+      if (permissionName === 'key') return false;
+      const permValue = userPermissions[permissionName as keyof UserPermissions];
+      return typeof permValue === 'boolean' ? permValue : false;
     }
     return false; // Not authenticated
   };
@@ -358,6 +364,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const value: any = { // Cast to any to avoid strict type mismatch during refactor if interface differs slightly
     isAuthenticated,
     isInitialSetup,
+    connectionError,
     companyInfo,
     products,
     rawMaterials,

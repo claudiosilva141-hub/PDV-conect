@@ -158,6 +158,7 @@ export interface UserPermissions {
 export interface AuthContextType {
   isAuthenticated: boolean;
   isInitialSetup: boolean;
+  connectionError: boolean;
   companyInfo: CompanyInfo;
   products: Product[];
   rawMaterials: RawMaterial[];

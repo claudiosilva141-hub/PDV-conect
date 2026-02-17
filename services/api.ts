@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Product, Client, Order, User, LoginCredentials, RegisterData, RawMaterial, CompanyInfo, UserPermissions } from '../types';
 
 const api = axios.create({
-    baseURL: 'http://localhost:3001/api',
+    baseURL: `http://${window.location.hostname}:3001/api`,
 });
 
 // Add interceptor to handle errors or tokens if needed

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db';
 import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
@@ -19,10 +20,10 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     const { username, password, role } = req.body;
     try {
-        // Generate UUID if not using database default (DB default is uuid_generate_v4(), so we can omit ID)
+        const hashedPassword = await bcrypt.hash(password, 10);
         const result = await query(
             'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at',
-            [username, password, role]
+            [username, hashedPassword, role]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -39,9 +40,10 @@ router.put('/:id', async (req, res) => {
     try {
         let result;
         if (password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
             result = await query(
                 'UPDATE users SET username = $1, role = $2, password = $3 WHERE id = $4 RETURNING id, username, role, created_at',
-                [username, role, password, id]
+                [username, role, hashedPassword, id]
             );
         } else {
             result = await query(
