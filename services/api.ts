@@ -1,8 +1,16 @@
 import axios from 'axios';
 import { Product, Client, Order, User, LoginCredentials, RegisterData, RawMaterial, CompanyInfo, UserPermissions } from '../types';
 
-const api = axios.create({
-    baseURL: `http://${window.location.hostname}:3001/api`,
+// Use environment variable for API URL
+// Development: http://localhost:3001/api
+// Production: Set VITE_API_URL in Vercel to your Render backend URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+export const api = axios.create({
+    baseURL: API_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
 // Add interceptor to include JWT token in requests
