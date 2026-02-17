@@ -4,7 +4,17 @@ import { Product, Client, Order, User, LoginCredentials, RegisterData, RawMateri
 // Use environment variable for API URL
 // Development: http://localhost:3001/api
 // Production: Set VITE_API_URL in Vercel to your Render backend URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Use environment variable for API URL or detect dynamically for local network access
+const getApiUrl = () => {
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+
+    // In development, if we are not on localhost, use the current hostname for the API
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:3001/api`;
+};
+
+const API_URL = getApiUrl();
 
 export const api = axios.create({
     baseURL: API_URL,
