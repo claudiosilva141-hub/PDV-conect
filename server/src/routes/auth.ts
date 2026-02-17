@@ -21,8 +21,7 @@ router.post('/login', async (req, res) => {
         }
 
         const user = result.rows[0];
-        // @ts-ignore
-        const isValidPassword = await (bcrypt as any).compare(String(password), user.password);
+        const isValidPassword = await bcrypt.compare(String(password), user.password);
 
         if (!isValidPassword) {
             return res.status(401).json({ message: 'Invalid credentials' });
@@ -49,8 +48,7 @@ router.post('/register', async (req, res) => {
     }
 
     try {
-        // @ts-ignore
-        const hashedPassword = await (bcrypt as any).hash(String(password), 10);
+        const hashedPassword = await bcrypt.hash(String(password), 10);
         const result = await query(
             'INSERT INTO app_users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
             [username, hashedPassword, role || 'user']

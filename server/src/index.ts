@@ -34,14 +34,16 @@ import userRoutes from './routes/users';
 import rawMaterialRoutes from './routes/raw-materials';
 import permissionRoutes from './routes/permissions';
 
+import { authenticateToken, requireAdmin } from './middleware/auth';
+
 app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/clients', clientRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/company', companyRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/raw-materials', rawMaterialRoutes);
-app.use('/api/permissions', permissionRoutes);
+app.use('/api/products', authenticateToken, productRoutes);
+app.use('/api/clients', authenticateToken, clientRoutes);
+app.use('/api/orders', authenticateToken, orderRoutes);
+app.use('/api/company', authenticateToken, companyRoutes);
+app.use('/api/users', authenticateToken, requireAdmin, userRoutes);
+app.use('/api/raw-materials', authenticateToken, rawMaterialRoutes);
+app.use('/api/permissions', authenticateToken, requireAdmin, permissionRoutes);
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date() });

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS company_info (
 );
 
 -- Users Table
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS app_users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   username VARCHAR(50) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL, -- Should be hashed in production

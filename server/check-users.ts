@@ -2,7 +2,7 @@ import { query } from './src/db';
 
 async function checkUsers() {
     try {
-        const result = await query('SELECT username, role FROM users');
+        const result = await query('SELECT username, role FROM app_users');
         console.log('--- USUÁRIOS NO BANCO ---');
         console.table(result.rows);
         if (result.rows.length === 0) {

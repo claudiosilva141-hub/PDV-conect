@@ -9,7 +9,7 @@ const client = new Client({
 async function check() {
     try {
         await client.connect();
-        const res = await client.query('SELECT username, password FROM users');
+        const res = await client.query('SELECT username, password FROM app_users');
         res.rows.forEach(r => {
             const isHashed = r.password.startsWith('$2');
             console.log(`USUARIO: ${r.username} | PASSWORD: ${isHashed ? '[HASHED]' : r.password}`);

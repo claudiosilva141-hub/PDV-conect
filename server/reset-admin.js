@@ -13,8 +13,8 @@ async function reset() {
         await client.connect();
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         const res = await client.query(
-            'UPDATE users SET password = $1 WHERE username = $2 RETURNING username',
-            [hashedPassword, 'admin']
+            'UPDATE app_users SET password = $1 WHERE username = $2 RETURNING username',
+            [hashedPassword, 'pai']
         );
 
         if (res.rowCount > 0) {
