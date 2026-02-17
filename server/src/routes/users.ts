@@ -20,7 +20,8 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     const { username, password, role } = req.body;
     try {
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // @ts-ignore
+        const hashedPassword = await (bcrypt as any).hash(String(password), 10);
         const result = await query(
             'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role, created_at',
             [username, hashedPassword, role]
@@ -40,7 +41,8 @@ router.put('/:id', async (req, res) => {
     try {
         let result;
         if (password) {
-            const hashedPassword = await bcrypt.hash(password, 10);
+            // @ts-ignore
+            const hashedPassword = await (bcrypt as any).hash(String(password), 10);
             result = await query(
                 'UPDATE users SET username = $1, role = $2, password = $3 WHERE id = $4 RETURNING id, username, role, created_at',
                 [username, role, hashedPassword, id]

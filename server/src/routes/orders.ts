@@ -65,6 +65,34 @@ router.post('/', async (req, res) => {
     try {
         await client.query('BEGIN');
 
+        // Validate stock availability for sales BEFORE creating the order
+        const isActiveOrder = status !== 'Orçamento' && status !== 'Cancelada';
+        if (isActiveOrder && type === 'sale' && items && items.length > 0) {
+            for (const item of items) {
+                if (item.id) {
+                    const stockResult = await client.query(
+                        'SELECT stock FROM products WHERE id = $1',
+                        [item.id]
+                    );
+                    if (stockResult.rows.length === 0) {
+                        await client.query('ROLLBACK');
+                        client.release();
+                        return res.status(400).json({
+                            message: `Produto "${item.name}" não encontrado.`
+                        });
+                    }
+                    const currentStock = stockResult.rows[0].stock;
+                    if (currentStock < item.quantity) {
+                        await client.query('ROLLBACK');
+                        client.release();
+                        return res.status(400).json({
+                            message: `Estoque insuficiente para "${item.name}". Disponível: ${currentStock}, Solicitado: ${item.quantity}`
+                        });
+                    }
+                }
+            }
+        }
+
         // Insert order
         const orderResult = await client.query(
             `INSERT INTO orders (
@@ -83,23 +111,40 @@ router.post('/', async (req, res) => {
         );
         const order = orderResult.rows[0];
 
-        // Insert order items (for sale/budget)
+        // Insert order items (for sale/budget) and update stock if not a budget
+
         if (items && items.length > 0) {
             for (const item of items) {
                 await client.query(
                     'INSERT INTO order_items (order_id, product_id, product_name, quantity, price) VALUES ($1, $2, $3, $4, $5)',
                     [order.id, item.id || null, item.name, item.quantity, item.price]
                 );
+
+                // Update product stock for sales
+                if (isActiveOrder && type === 'sale' && item.id) {
+                    await client.query(
+                        'UPDATE products SET stock = stock - $1 WHERE id = $2',
+                        [item.quantity, item.id]
+                    );
+                }
             }
         }
 
-        // Insert production items (for service orders)
+        // Insert production items (for service orders) and update raw materials stock
         if (productionDetails && productionDetails.length > 0) {
             for (const item of productionDetails) {
                 await client.query(
                     'INSERT INTO production_items (order_id, name, type, unit, quantity_used, cost_per_unit, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)',
                     [order.id, item.name, item.type, item.unit, item.quantityUsed, item.costPerUnit, item.notes || null]
                 );
+
+                // Update raw materials stock for Service Orders (only if type is raw_material)
+                if (isActiveOrder && type === 'service-order' && item.type === 'raw_material') {
+                    await client.query(
+                        'UPDATE raw_materials SET quantity = quantity - $1 WHERE name = $2',
+                        [item.quantityUsed, item.name]
+                    );
+                }
             }
         }
 
@@ -136,6 +181,33 @@ router.put('/:id', async (req, res) => {
 
     const client = await getClient();
     try {
+        // Fetch old order and items to restore stock
+        const oldOrderResult = await client.query('SELECT type, status FROM orders WHERE id = $1', [id]);
+        if (oldOrderResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+        const oldOrder = oldOrderResult.rows[0];
+        const wasActive = oldOrder.status !== 'Orçamento' && oldOrder.status !== 'Cancelada';
+
+        if (wasActive) {
+            // Restore product stock
+            if (oldOrder.type === 'sale') {
+                const oldItems = await client.query('SELECT product_id, quantity FROM order_items WHERE order_id = $1', [id]);
+                for (const item of oldItems.rows) {
+                    if (item.product_id) {
+                        await client.query('UPDATE products SET stock = stock + $1 WHERE id = $2', [item.quantity, item.product_id]);
+                    }
+                }
+            }
+            // Restore raw materials
+            if (oldOrder.type === 'service-order') {
+                const oldProduction = await client.query('SELECT name, quantity_used FROM production_items WHERE order_id = $1 AND type = \'raw_material\'', [id]);
+                for (const item of oldProduction.rows) {
+                    await client.query('UPDATE raw_materials SET quantity = quantity + $1 WHERE name = $2', [item.quantity_used, item.name]);
+                }
+            }
+        }
+
         await client.query('BEGIN');
 
         // Update order
@@ -161,6 +233,7 @@ router.put('/:id', async (req, res) => {
         }
 
         const order = orderResult.rows[0];
+        const isActive = status !== 'Orçamento' && status !== 'Cancelada';
 
         // Delete existing items and production details
         await client.query('DELETE FROM order_items WHERE order_id = $1', [id]);
@@ -173,6 +246,10 @@ router.put('/:id', async (req, res) => {
                     'INSERT INTO order_items (order_id, product_id, product_name, quantity, price) VALUES ($1, $2, $3, $4, $5)',
                     [id, item.id || null, item.name, item.quantity, item.price]
                 );
+
+                if (isActive && type === 'sale' && (item.id || item.productId)) {
+                    await client.query('UPDATE products SET stock = stock - $1 WHERE id = $2', [item.quantity, item.id || item.productId]);
+                }
             }
         }
 
@@ -183,6 +260,10 @@ router.put('/:id', async (req, res) => {
                     'INSERT INTO production_items (order_id, name, type, unit, quantity_used, cost_per_unit, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)',
                     [id, item.name, item.type, item.unit, item.quantityUsed, item.costPerUnit, item.notes || null]
                 );
+
+                if (isActive && type === 'service-order' && item.type === 'raw_material') {
+                    await client.query('UPDATE raw_materials SET quantity = quantity - $1 WHERE name = $2', [item.quantityUsed, item.name]);
+                }
             }
         }
 
@@ -197,15 +278,44 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// Delete order
+// Delete order with stock restoration
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
+    const client = await getClient();
     try {
-        await query('DELETE FROM orders WHERE id = $1', [id]);
+        await client.query('BEGIN');
+
+        // Restore stock before deleting
+        const orderResult = await client.query('SELECT type, status FROM orders WHERE id = $1', [id]);
+        if (orderResult.rows.length > 0) {
+            const order = orderResult.rows[0];
+            if (order.status !== 'Orçamento' && order.status !== 'Cancelada') {
+                if (order.type === 'sale') {
+                    const items = await client.query('SELECT product_id, quantity FROM order_items WHERE order_id = $1', [id]);
+                    for (const item of items.rows) {
+                        if (item.product_id) {
+                            await client.query('UPDATE products SET stock = stock + $1 WHERE id = $2', [item.quantity, item.product_id]);
+                        }
+                    }
+                }
+                if (order.type === 'service-order') {
+                    const production = await client.query('SELECT name, quantity_used FROM production_items WHERE order_id = $1 AND type = \'raw_material\'', [id]);
+                    for (const item of production.rows) {
+                        await client.query('UPDATE raw_materials SET quantity = quantity + $1 WHERE name = $2', [item.quantity_used, item.name]);
+                    }
+                }
+            }
+        }
+
+        await client.query('DELETE FROM orders WHERE id = $1', [id]);
+        await client.query('COMMIT');
         res.status(204).send();
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error(err);
         res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
     }
 });
 

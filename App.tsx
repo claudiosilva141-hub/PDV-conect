@@ -57,13 +57,13 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         loadedUsers,
         loadedPermissions
       ] = await Promise.all([
-        companyService.get(),
-        productService.getAll(),
-        rawMaterialService.getAll(),
-        orderService.getAll(),
-        clientService.getAll(),
-        userService.getAll(),
-        permissionService.get()
+        companyService.get().catch(() => ({ name: COMPANY_NAME_DEFAULT, logo: null })),
+        productService.getAll().catch(() => []),
+        rawMaterialService.getAll().catch(() => []),
+        orderService.getAll().catch(() => []),
+        clientService.getAll().catch(() => []),
+        userService.getAll().catch(() => []),
+        permissionService.get().catch(() => DEFAULT_USER_PERMISSIONS)
       ]);
 
       setCompanyInfo(loadedCompanyInfo);
@@ -83,6 +83,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       if (storedCurrentUser) {
         setCurrentUser(JSON.parse(storedCurrentUser));
       }
+      // Auto-login removed for security - users must explicitly login
 
       // Check for userPermissions in localStorage and apply if present
       const savedPermissions = localStorage.getItem('userPermissions');
@@ -303,7 +304,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   // User management functions
   const registerUser = async (username: string, password: string, role: UserRole): Promise<void> => {
     try {
-      const newUser = await userService.create({ username, password, role });
+      const newUser = await authService.register({ username, password, role });
       setUsers((prev) => [...prev, newUser]);
       setIsInitialSetup(false);
     } catch (error) {
@@ -412,7 +413,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const location = useLocation();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

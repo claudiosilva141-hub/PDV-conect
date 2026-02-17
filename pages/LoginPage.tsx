@@ -15,7 +15,6 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Clear fields on mode toggle
   useEffect(() => {
     setUsername('');
     setPassword('');

@@ -43,9 +43,6 @@ export const Header: React.FC = () => {
         >
           <span className="hidden md:inline">Sincronizar</span>
         </Button>
-        <Button variant="ghost" onClick={logout} icon={<LogOut className="h-5 w-5" />}>
-          <span className="hidden sm:inline">Sair</span>
-        </Button>
       </div>
     </header>
   );

@@ -12,7 +12,6 @@ export enum UserRole {
 export interface User {
   id: string;
   username: string;
-  password: string; // Stored in plain text for simplicity in this local app example, but insecure for production
   role: UserRole;
 }
 

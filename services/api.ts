@@ -5,23 +5,57 @@ const api = axios.create({
     baseURL: `http://${window.location.hostname}:3001/api`,
 });
 
+// Add interceptor to include JWT token in requests
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
 // Add interceptor to handle errors or tokens if needed
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         console.error('API Error:', error.response?.data || error.message);
+
+        // If token is invalid or expired, clear it and redirect to login
+        if (error.response?.status === 401 || error.response?.status === 403) {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            window.location.hash = '/login';
+        }
+
         return Promise.reject(error);
     }
 );
 
 export const authService = {
     login: async (credentials: LoginCredentials) => {
-        const response = await api.post<User>('/auth/login', credentials);
-        return response.data;
+        const response = await api.post<User & { token: string }>('/auth/login', credentials);
+        // Store token in localStorage
+        if (response.data.token) {
+            localStorage.setItem('authToken', response.data.token);
+        }
+        // Return user without token
+        const { token, ...user } = response.data;
+        return user as User;
     },
     register: async (data: RegisterData) => {
-        const response = await api.post<User>('/auth/register', data);
-        return response.data;
+        const response = await api.post<User & { token: string }>('/auth/register', data);
+        // Store token in localStorage
+        if (response.data.token) {
+            localStorage.setItem('authToken', response.data.token);
+        }
+        // Return user without token
+        const { token, ...user } = response.data;
+        return user as User;
     },
 };
 

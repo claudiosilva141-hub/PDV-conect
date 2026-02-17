@@ -3,15 +3,15 @@ import { GEMINI_MODEL_TEXT } from '../constants';
 import { formatCurrency } from '../utils/currencyFormatter';
 
 const getGeminiClient = () => {
-  // CRITICAL: Create a new GoogleGenAI instance right before making an API call
-  // to ensure it always uses the most up-to-date API key from the dialog.
-  if (!process.env.API_KEY) {
-    console.error("API_KEY is not defined. Please ensure it's set in your environment.");
-    // In a real app, you might throw an error or handle this more gracefully
-    // For now, we'll return a mock client or null
+  // Get API key from localStorage (set by user in settings)
+  const apiKey = localStorage.getItem('GEMINI_API_KEY');
+
+  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+    console.warn("Gemini API Key não configurada. Configure em Configurações.");
     return null;
   }
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  return new GoogleGenAI({ apiKey });
 };
 
 /**
@@ -29,9 +29,8 @@ export const generateProductDescription = async (
     return 'Erro: Chave de API não configurada para gerar descrição.';
   }
 
-  const prompt = `Gere uma descrição de produto criativa e comercial para "${productName}". Inclua detalhes sobre tecido, estilo e para quem se destina. ${
-    keywords ? `Palavras-chave: ${keywords}.` : ''
-  } A descrição deve ter no máximo 100 palavras.`;
+  const prompt = `Gere uma descrição de produto criativa e comercial para "${productName}". Inclua detalhes sobre tecido, estilo e para quem se destina. ${keywords ? `Palavras-chave: ${keywords}.` : ''
+    } A descrição deve ter no máximo 100 palavras.`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({

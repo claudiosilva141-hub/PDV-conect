@@ -3,6 +3,15 @@ import { query } from '../db';
 
 const router = Router();
 
+// Helper to convert snake_case to camelCase
+const toCamelCase = (row: any) => {
+    const newRow: any = {};
+    for (const key in row) {
+        newRow[key.replace(/_([a-z])/g, (g) => g[1].toUpperCase())] = row[key];
+    }
+    return newRow;
+};
+
 // Get all products
 router.get('/', async (req, res) => {
     try {
@@ -12,14 +21,14 @@ router.get('/', async (req, res) => {
         name, 
         description, 
         price::float, 
-        cost_price::float as "costPrice", 
+        cost_price, 
         stock::int, 
-        image_url as "imageUrl", 
-        created_at as "createdAt"
+        image_url, 
+        created_at
       FROM products 
       ORDER BY created_at DESC
     `);
-        res.json(result.rows);
+        res.json(result.rows.map(toCamelCase));
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -33,7 +42,7 @@ router.post('/', async (req, res) => {
             'INSERT INTO products (name, description, price, cost_price, stock, image_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
             [name, description, price, costPrice, stock, imageUrl]
         );
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(toCamelCase(result.rows[0]));
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
@@ -50,7 +59,7 @@ router.put('/:id', async (req, res) => {
             [name, description, price, costPrice, stock, imageUrl, id]
         );
         if (result.rows.length === 0) return res.status(404).json({ message: 'Product not found' });
-        res.json(result.rows[0]);
+        res.json(toCamelCase(result.rows[0]));
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
