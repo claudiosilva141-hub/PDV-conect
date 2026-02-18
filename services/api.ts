@@ -8,13 +8,22 @@ import { Product, Client, Order, User, LoginCredentials, RegisterData, RawMateri
 const getApiUrl = () => {
     if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
 
-    // In development, if we are not on localhost, use the current hostname for the API
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
+
+    // If we are on Vercel, we shouldn't attempt to use port 3001 on the same domain
+    if (hostname.includes('vercel.app')) {
+        // Fallback or specific production URL if known
+        // Return Render backend URL (as discussed in previous conversations)
+        return 'https://pdv-conect-backend.onrender.com/api';
+    }
+
+    // In development/local network, use the current hostname (IP or localhost)
     return `${protocol}//${hostname}:3001/api`;
 };
 
 const API_URL = getApiUrl();
+console.log('[API DEBUG] Base URL:', API_URL);
 
 export const api = axios.create({
     baseURL: API_URL,
