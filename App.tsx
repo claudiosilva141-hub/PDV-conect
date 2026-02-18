@@ -13,7 +13,7 @@ import { COMPANY_NAME_DEFAULT, DEFAULT_USER_PERMISSIONS } from './constants';
 import { StockPage } from './pages/StockPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ClientsPage } from './pages/ClientsPage';
-import { authService, companyService, productService, clientService, orderService, rawMaterialService, userService, permissionService } from './services/api';
+import { api, authService, companyService, productService, clientService, orderService, rawMaterialService, userService, permissionService } from './services/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -150,9 +150,12 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         return true;
       }
       return false;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed:', error);
-      return false;
+      if (error.code === 'ECONNABORTED' || !error.response) {
+        throw new Error('Servidor inacessível. Verifique sua conexão ou Firewall.');
+      }
+      throw new Error(error.response?.data?.message || 'Credenciais inválidas. Verifique seu usuário e senha.');
     }
   };
 
@@ -406,6 +409,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     updateUserPermissions,
     checkPermission,
     refreshData: loadData,
+    apiUrl: api.defaults.baseURL
   };
 
   if (!dataLoaded) {

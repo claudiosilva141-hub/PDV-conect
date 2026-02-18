@@ -7,7 +7,7 @@ import { Input } from '../components/Input';
 import { LogIn, User, Lock, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { login, isAuthenticated, isInitialSetup, connectionError, companyInfo, registerUser } = useAuth();
+  const { login, isAuthenticated, isInitialSetup, connectionError, companyInfo, registerUser, apiUrl } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -70,14 +70,10 @@ export const LoginPage: React.FC = () => {
         return;
       }
 
-      const loginSuccess = await login(username.trim(), password.trim());
-      if (loginSuccess) {
-        navigate('/', { replace: true });
-      } else {
-        setError('Credenciais inválidas. Verifique seu usuário e senha.');
-      }
+      await login(username.trim(), password.trim());
+      navigate('/', { replace: true });
     } catch (err: any) {
-      setError('Erro de conexão. Verifique se o servidor está online.');
+      setError(err.message || 'Erro ao realizar login.');
     } finally {
       setIsLoading(false);
     }
@@ -205,7 +201,7 @@ export const LoginPage: React.FC = () => {
               &copy; {new Date().getFullYear()} {companyInfo.name || 'Gerenciador de Vendas'}
             </p>
             <div className="mt-2 text-center text-[10px] text-gray-300 opacity-50">
-              API: {import.meta.env.VITE_API_URL || 'Auto (Port 3001)'}
+              Conectado a: {apiUrl}
             </div>
           </form>
         )}

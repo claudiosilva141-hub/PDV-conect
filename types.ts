@@ -187,4 +187,5 @@ export interface AuthContextType {
   checkPermission: (permissionName: keyof UserPermissions) => boolean; // New: Helper to check permission
   deleteOrder: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
+  apiUrl: string;
 }
