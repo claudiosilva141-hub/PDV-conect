@@ -43,69 +43,49 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [isInitialSetup, setIsInitialSetup] = useState<boolean>(false);
   const [connectionError, setConnectionError] = useState<boolean>(false);
 
+  // isAuthenticated is true if currentUser exists
+  const isAuthenticated = !!currentUser;
+
   const loadData = async () => {
     try {
       console.log('Fetching data from API...');
 
       // Parallel fetching for performance
-      const [
-        loadedCompanyInfo,
-        loadedProducts,
-        loadedRawMaterials,
-        loadedOrders,
-        loadedClients,
-        loadedUsers,
-        loadedPermissions
-      ] = await Promise.all([
-        companyService.get().catch(() => ({ name: COMPANY_NAME_DEFAULT, logo: null })),
-        productService.getAll().catch(() => []),
-        rawMaterialService.getAll().catch(() => []),
-        orderService.getAll().catch(() => []),
-        clientService.getAll().catch(() => []),
-        userService.getAll().catch(() => []),
-        permissionService.get().catch(() => DEFAULT_USER_PERMISSIONS)
-      ]);
-
+      const loadedCompanyInfo = await companyService.get().catch(() => ({ name: COMPANY_NAME_DEFAULT, logo: null }));
       setCompanyInfo(loadedCompanyInfo);
-      setProducts(loadedProducts);
-      setRawMaterials(loadedRawMaterials);
-      setOrders(loadedOrders);
-      setClients(loadedClients);
-      setUsers(loadedUsers);
-      setUserPermissions(loadedPermissions);
-
-      // Only set initial setup if we successfully fetched users AND the list is empty
-      setIsInitialSetup(loadedUsers.length === 0);
-      setConnectionError(false);
 
       // Check for session (simple localStorage persistence for currentUser)
       const storedCurrentUser = localStorage.getItem('currentUser');
-      if (storedCurrentUser) {
-        setCurrentUser(JSON.parse(storedCurrentUser));
-      }
-      // Auto-login removed for security - users must explicitly login
+      const token = localStorage.getItem('authToken');
 
-      // Check for userPermissions in localStorage and apply if present
-      const savedPermissions = localStorage.getItem('userPermissions');
-      if (savedPermissions) {
+      if (storedCurrentUser && token) {
         try {
-          const parsedPermissions: UserPermissions = JSON.parse(savedPermissions);
-          setUserPermissions(parsedPermissions);
+          const parsedUser = JSON.parse(storedCurrentUser);
+          setCurrentUser(parsedUser);
         } catch (e) {
-          console.error('Failed to parse userPermissions from localStorage:', e);
-          // Fallback to loadedPermissions or default if parsing fails
-          setUserPermissions(loadedPermissions);
+          console.error('Failed to parse stored user:', e);
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('authToken');
         }
       } else {
-        // If no saved permissions, use the ones loaded from the API
-        setUserPermissions(loadedPermissions);
+        // Not logged in. Check if we need initial setup.
+        // we can move this check to a dedicated effect or just here
+        try {
+          const loadedUsers = await userService.getAll();
+          setIsInitialSetup(loadedUsers.length === 0);
+        } catch (e) {
+          // If 401, it means there are likely users but we aren't one of them yet
+          // or we just aren't logged in. 
+          // Better logic: if we get 401, assume NOT initial setup.
+          setIsInitialSetup(false);
+        }
       }
 
+      setConnectionError(false);
       setDataLoaded(true);
       console.log('Data loaded successfully.');
     } catch (error) {
-      console.error('Failed to load data from Supabase:', error);
-      // If loading fails, it's likely a connection issue
+      console.error('Failed to load data during initialization:', error);
       setConnectionError(true);
       setDataLoaded(true);
     }
@@ -115,6 +95,40 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Fetch full data when user logs in
+  useEffect(() => {
+    if (isAuthenticated) {
+      const fetchProtectedData = async () => {
+        try {
+          const [
+            loadedProducts,
+            loadedRawMaterials,
+            loadedOrders,
+            loadedClients,
+            loadedUsers,
+            loadedPermissions
+          ] = await Promise.all([
+            productService.getAll().catch(() => []),
+            rawMaterialService.getAll().catch(() => []),
+            orderService.getAll().catch(() => []),
+            clientService.getAll().catch(() => []),
+            userService.getAll().catch(() => []),
+            permissionService.get().catch(() => DEFAULT_USER_PERMISSIONS)
+          ]);
+          setProducts(loadedProducts);
+          setRawMaterials(loadedRawMaterials);
+          setOrders(loadedOrders);
+          setClients(loadedClients);
+          setUsers(loadedUsers);
+          setUserPermissions(loadedPermissions);
+        } catch (error) {
+          console.error('Failed to fetch protected data:', error);
+        }
+      };
+      fetchProtectedData();
+    }
+  }, [isAuthenticated]);
 
   // --- Persistence Effects Removed (Handled by API calls in functions) ---
 
@@ -126,9 +140,6 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       localStorage.removeItem('currentUser');
     }
   }, [currentUser]);
-
-  // isAuthenticated is true if currentUser exists
-  const isAuthenticated = !!currentUser;
 
   // Login function
   const login = async (usernameInput: string, passwordInput: string): Promise<boolean> => {

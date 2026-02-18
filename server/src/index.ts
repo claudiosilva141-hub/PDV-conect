@@ -22,9 +22,17 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json({ limit: '10mb' })); // Increase limit for base64 images
+app.use(express.json({ limit: '10mb' }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+// Increase limit for base64 images
 
 // Routes
+import { query } from './db';
 import authRoutes from './routes/auth';
 import productRoutes from './routes/products';
 import clientRoutes from './routes/clients';
@@ -40,7 +48,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', authenticateToken, productRoutes);
 app.use('/api/clients', authenticateToken, clientRoutes);
 app.use('/api/orders', authenticateToken, orderRoutes);
-app.use('/api/company', authenticateToken, companyRoutes);
+app.use('/api/company', companyRoutes); // Unprotected for login page
 app.use('/api/users', authenticateToken, requireAdmin, userRoutes);
 app.use('/api/raw-materials', authenticateToken, rawMaterialRoutes);
 app.use('/api/permissions', authenticateToken, requireAdmin, permissionRoutes);
@@ -50,8 +58,15 @@ app.get('/api/health', (req, res) => {
 });
 
 // Start Server
-app.listen(Number(PORT), '0.0.0.0', () => {
+app.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Accessible locally at http://localhost:${PORT}`);
+
+    // Test database connection
+    try {
+        const result = await query('SELECT NOW()');
+        console.log(`[${new Date().toISOString()}] Database connected successfully: ${result.rows[0].now}`);
+    } catch (err) {
+        console.error(`[${new Date().toISOString()}] CRITICAL: Database connection failed!`, (err as Error).message);
+    }
 });
-// Force restart - 1
