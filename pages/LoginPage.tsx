@@ -204,6 +204,9 @@ export const LoginPage: React.FC = () => {
             <p className="text-center text-xs text-gray-400 pt-4">
               &copy; {new Date().getFullYear()} {companyInfo.name || 'Gerenciador de Vendas'}
             </p>
+            <div className="mt-2 text-center text-[10px] text-gray-300 opacity-50">
+              API: {import.meta.env.VITE_API_URL || 'Auto (Port 3001)'}
+            </div>
           </form>
         )}
       </div>

@@ -16,19 +16,33 @@ router.post('/login', async (req, res) => {
     try {
         const result = await query('SELECT * FROM app_users WHERE username = $1', [username]);
 
+        console.log(`[AUTH DEBUG] ${new Date().toISOString()} Login attempt for username: "${username}" (Type: ${typeof username})`);
+        console.log(`[AUTH DEBUG] Password length received: ${password?.length}`);
+
         if (result.rows.length === 0) {
+            console.log(`[AUTH DEBUG] User "${username}" NOT FOUND in app_users table.`);
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
         const user = result.rows[0];
-        const isValidPassword = await bcrypt.compare(String(password), user.password);
+        console.log(`[AUTH DEBUG] User found: ${user.username}, Role: ${user.role}`);
 
-        if (!isValidPassword) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+        try {
+            const isValidPassword = await bcrypt.compare(String(password), user.password);
+            console.log(`[AUTH DEBUG] Bcrypt compare result: ${isValidPassword}`);
+
+            if (!isValidPassword) {
+                console.log(`[AUTH DEBUG] Password mismatch for user: ${username}`);
+                return res.status(401).json({ message: 'Invalid credentials' });
+            }
+        } catch (compareError) {
+            console.error(`[AUTH DEBUG] Bcrypt compare error:`, compareError);
+            return res.status(500).json({ message: 'Error comparing passwords' });
         }
 
         // Generate JWT token
         const token = generateToken(user.id, user.role);
+        console.log(`[AUTH DEBUG] Login successful for: ${username}`);
 
         // Return user without password
         const { password: _, ...userWithoutPassword } = user;
